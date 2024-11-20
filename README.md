@@ -36,25 +36,50 @@ Interactive Visualization: The app could be enhanced to allow users to select sp
 
 # Code
 
+    # Load necessary libraries
+    library(shiny)
+    library(ggplot2)
     library(gganimate)
     library(gifski)
-    library(gapminder)
-    library(ggplot2)
-
-    # Assuming 'Intel' dataset is loaded
+    
     Intel$Date <- as.Date(Intel$Date, format = "%m/%d/%Y")
-
-    # Create basic line plot
-    p <- ggplot(Intel, aes(x = Date, y = Close)) +
-    geom_line(color = "blue") +
-    geom_point() +
-    labs(title = "Closing Price Over Time", x = "Date", y = "Closing Price") +
-    theme_minimal()
-
-    # Add animation to reveal the line over time
-    p_animated <- p + 
-    transition_reveal(Date) +
-    labs(title = "Closing Price Over Time: {frame_along}")
-
-    # Render the animation
-    animate(p_animated, nframes = 100, fps = 10, width = 800, height = 400)
+    
+    # Shiny app UI
+    ui <- shinyUI(
+      tagList(
+        tags$h1("Closing Price Over Time"),
+        tags$label("Select Date Range:"),
+        sliderInput("dateRange", "",
+                    min = min(Intel$Date), max = max(Intel$Date),
+                    value = c(min(Intel$Date), max(Intel$Date)),
+                    timeFormat = "%Y-%m-%d"),
+        imageOutput("animatedPlot")
+      )
+    )
+    
+    # Shiny server
+    server <- function(input, output) {
+      output$animatedPlot <- renderImage({
+        # Filter data based on selected date range
+        filtered_data <- Intel[Intel$Date >= input$dateRange[1] & Intel$Date <= input$dateRange[2], ]
+        
+        # Create animated line plot
+        p <- ggplot(filtered_data, aes(x = Date, y = Close)) +
+          geom_line(color = "blue") +
+          geom_point() +
+          labs(title = "Closing Price Over Time", x = "Date", y = "Closing Price") +
+          theme_minimal() +
+          transition_reveal(Date) +
+          labs(title = "Closing Price Over Time: {frame_along}")
+        
+        # Render the animation and save as GIF
+        anim <- animate(p, nframes = 100, fps = 10, width = 800, height = 400)
+        anim_save("animated_plot.gif", animation = anim)
+        
+        # Return the GIF to display in the UI
+        list(src = "animated_plot.gif", contentType = 'image/gif')
+      }, deleteFile = FALSE)
+    }
+    
+    # Run the Shiny app
+    shinyApp(ui = ui, server = server)
